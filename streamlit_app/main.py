@@ -9,7 +9,11 @@ from folium import FeatureGroup, GeoJson, GeoJsonTooltip, LayerControl, Map, Mar
 from streamlit_folium import st_folium
 from xyzservices import TileProvider
 
+import geohash
+
 logger = getLogger(__name__)
+
+PRECISION = 4
 
 
 def query(lat_min: float, lon_min: float, lat_max: float, lon_max: float) -> str:
@@ -109,10 +113,18 @@ def main():
 
     col1, col2 = st.columns([2, 1])
 
-    box = st.session_state.get("request_box")
+    codes = None
+    gdf = None
+    box = st.session_state.get("box")
     if box is not None:
         logger.info(f"request: {box}")
-        data = branches(query(*box))
+
+        codes = st.session_state.setdefault("codes", set())
+        data = {}
+        for code in geohash.create_rect(*box, PRECISION):
+            codes.add(code)
+            data.update(branches(query(*geohash.decode(code))))
+
         if data:
             gdf = gpd.GeoDataFrame.from_dict(data, orient="index", crs="EPSG:4326")
             geojson = FeatureGroup(name="branch")
@@ -128,11 +140,6 @@ def main():
                 markers.add_child(Marker(location=[lat0, lon0]))  # type: ignore
             ls.append(geojson)
             ls.append(markers)
-            st.subheader("query")
-            st.code(query(*box))
-            st.subheader("result")
-            st.dataframe(gdf.drop(columns=["geometry"]))
-        st.session_state.result_box = box
 
     layer_control = LayerControl()
     with col1:
@@ -147,6 +154,17 @@ def main():
             feature_group_to_add=ls,
             layer_control=layer_control,
         )
+
+    st.subheader("query")
+    if codes is not None:
+        st.code(codes)
+    else:
+        st.info("No code")
+    st.subheader("result")
+    if gdf is not None:
+        st.dataframe(gdf.drop(columns=["geometry"]))
+    else:
+        st.info("No dataframe")
 
     try:
         box = Rect(
@@ -165,25 +183,24 @@ def main():
             lon + 0.05,
         )
 
-    if 0 < box.width < 0.1 and 0 < box.height < 0.1:
-        result_box = st.session_state.get("result_box")
-        if result_box is None:
-            logger.info("request new box, rerun")
-            st.session_state.request_box = box
+    if st_data["zoom"] >= 12:
+        codes = st.session_state.get("codes")
+        if codes is None:
+            logger.info("rerun")
+            st.session_state.box = box
             st.rerun()
-        elif result_box.contains(box):
-            logger.info("result box contains new box, keep")
-        elif box != st.session_state.get("request_box"):
-            logger.info("request new box, rerun")
-            st.session_state.request_box = box
+        elif st.session_state.get("box") is None:
+            st.session_state.box = box
             st.rerun()
-    else:
-        logger.info("box too large or empty, remove")
-        if st.session_state.get("result_box") is not None:
-            st.session_state["result_box"] = None
-        if st.session_state.get("request_box") is not None:
-            st.session_state["request_box"] = None
-            st.rerun()
+        else:
+            for code in geohash.create_rect(*box, PRECISION):
+                if code not in codes:
+                    logger.info("rerun")
+                    st.session_state.box = box
+                    st.rerun()
+    elif st.session_state.get("box") is not None:
+        st.session_state.box = None
+        st.rerun()
 
     with col2:
         st.write(st_data)
