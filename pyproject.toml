@@ -13,6 +13,7 @@ pandas = "^2.2.3"
 streamlit = "^1.24.0"
 streamlit-folium = "^0.23.0"
 pefile = "<2024.8.26"
+numba = "^0.60.0"
 
 
 [tool.poetry.group.dev.dependencies]
