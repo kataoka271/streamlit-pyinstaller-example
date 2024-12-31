@@ -1,6 +1,7 @@
 from logging import basicConfig, getLogger
 from typing import Any, NamedTuple
 
+import geohash
 import geopandas as gpd
 import overpy
 import shapely
@@ -8,8 +9,6 @@ import streamlit as st
 from folium import FeatureGroup, GeoJson, GeoJsonTooltip, LayerControl, Map, Marker, TileLayer
 from streamlit_folium import st_folium
 from xyzservices import TileProvider
-
-import geohash
 
 logger = getLogger(__name__)
 
@@ -121,7 +120,7 @@ def main():
 
         codes = st.session_state.setdefault("codes", set())
         data = {}
-        for code in geohash.create_rect(*box, PRECISION):
+        for code in geohash.create_rect(*box, PRECISION):  # type: ignore
             codes.add(code)
             data.update(branches(query(*geohash.decode(code))))
 

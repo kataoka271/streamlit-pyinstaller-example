@@ -17,7 +17,8 @@ numba = "^0.60.0"
 
 
 [tool.poetry.group.dev.dependencies]
-pyinstaller = "^6.10.0"
+streamlit-desktop-app = "^0.3.4"
+
 
 [build-system]
 requires = ["poetry-core"]
